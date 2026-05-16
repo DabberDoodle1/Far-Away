@@ -171,25 +171,7 @@ void Engine::start() {
     }
 }
 
-void Engine::handle_input() {
-    selected = nullptr;
-
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        glfwGetCursorPos(window, &cursor_x, &cursor_y);
-
-        for (int i = 0; i < ResourceManager::objects.entries.size(); ++i) {
-            if (Text* text  = std::get_if<Text>(&ResourceManager::objects.entries[i])) {
-                const float half_w1 = text->w / 2.0f;
-                const float half_h1 = text->h / 2.0f;
-
-                if (cursor_x >= text->x - half_w1 && cursor_x <= text->x + half_w1 &&
-                        cursor_y >= text->y - half_h1 && cursor_y <= text->y + half_h1) {
-                    selected = text;
-                }
-            }
-        }
-    }
-}
+void Engine::handle_input() {}
 
 void Engine::handle_physics(double delta_time) {
     ResourceManager::update_models();
@@ -207,4 +189,23 @@ void Engine::key_callback(GLFWwindow* window, int key, int scancode, int action,
 }
 
 void Engine::mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (action == GLFW_PRESS) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !selected) {
+            glfwGetCursorPos(window, &cursor_x, &cursor_y);
+
+            for (int i = 0; i < ResourceManager::objects.entries.size(); ++i) {
+                if (Text* text = std::get_if<Text>(&ResourceManager::objects.entries[i])) {
+                    const float half_w1 = text->w / 2.0f;
+                    const float half_h1 = text->h / 2.0f;
+
+                    if (cursor_x >= text->x - half_w1 && cursor_x <= text->x + half_w1 &&
+                            cursor_y >= text->y - half_h1 && cursor_y <= text->y + half_h1) {
+                        selected = text;
+                    }
+                }
+            }
+        }
+    } else {
+        selected = nullptr;
+    }
 }
