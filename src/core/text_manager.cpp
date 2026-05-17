@@ -54,19 +54,126 @@ void TextManager::set_font(const char* key)
 
 Text& TextManager::create_text(const char16_t* text, Size fs, unsigned int& dip) {
     const FontHandle::BitmapData* bitmap;
-    //unsigned int max_width  = 0;
-    //unsigned int max_height = 0;
 
-    //unsigned int row_w = 0;
+    // Final values
+    unsigned int max_width  = 0;
+    unsigned int max_height = 0;
+
+    // Current row values
     unsigned int width = 0;
     unsigned int above = 0;
     unsigned int below = 0;
 
     // Calculating for total width, max height above and below y = 0 line
-    for (const char16_t* start = text; *start != u'\0'; ++start)
-    {
+    for (const char16_t* start = text; *start != u'\0'; ++start) {
         const char16_t ch = *start;
-        bitmap            = active_font->get_char(ch, fs);
+
+        if (ch == u' ' && *(start + 1) == u'\0') {
+            break;
+        }
+
+        if (ch == u'\n') {
+            // Comparing and adjusting current and final values
+            max_width   = (width > max_width) ? width : max_width;
+            max_height += above + below;
+
+            // Resetting current row values
+            width = 0;
+            above = 0;
+            below = 0;
+
+            continue;
+        }
+
+        bitmap = active_font->get_char(ch, fs);
+
+        if (bitmap == nullptr) {
+            bitmap = active_font->get_char(u' ', fs);
+        }
+
+        width += bitmap->advance_x;
+        above  = (above > bitmap->bearing_y) ? above : bitmap->bearing_y;
+
+        // On chars like '-', the height is very small but the bearing_y is very big because it's off the ground
+        if (bitmap->bearing_y <= bitmap->height) {
+            below = (below > bitmap->height - bitmap->bearing_y) ? below : bitmap->height - bitmap->bearing_y;
+        }
+    }
+
+    width -= bitmap->advance_x;
+    width += bitmap->bearing_x + bitmap->width;
+    dip    = below;
+
+    max_width   = (max_width > width) ? max_width : width;
+    max_height += above + below;
+
+    // Generating a texture object for the whole text generated in OpenGL
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, max_width, max_height, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+
+    const char16_t* curr_line = text;
+    unsigned int curr_height  = 0;
+    unsigned int offset       = 0;
+
+    above = 0;
+    below = 0;
+
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    for (const char16_t* curr = text; *curr != u'\0'; ++curr) {
+        const char16_t ch = *curr;
+
+        if (ch == u' ' && *(curr+ 1) == u'\0') {
+            break;
+        }
+
+        if (ch == u'\n' || *(curr + 1) == u'\0') {
+            if (*(curr + 1) == u'\0') {
+                bitmap = active_font->get_char(ch, fs);
+
+                if (bitmap == nullptr) {
+                    bitmap = active_font->get_char(u' ', fs);
+                }
+
+                width += bitmap->advance_x;
+                above  = (above > bitmap->bearing_y) ? above : bitmap->bearing_y;
+
+                if (bitmap->bearing_y <= bitmap->height) {
+                    below = (below > bitmap->height - bitmap->bearing_y) ? below : bitmap->height - bitmap->bearing_y;
+                }
+            }
+
+            for (const char16_t* start = curr_line; start - curr < 1; ++start) {
+                bitmap = active_font->get_char(*start, fs);
+
+                glTexSubImage2D(GL_TEXTURE_2D, 0,
+                                offset + bitmap->bearing_x, max_height - curr_height - above - (bitmap->height - bitmap->bearing_y),
+                                bitmap->width, bitmap->height,
+                                GL_RED, GL_UNSIGNED_BYTE, bitmap->data);
+
+                offset += bitmap->advance_x;
+            }
+
+            curr_height += above + below;
+            curr_line    = curr + 1;
+
+            // Resetting current row values
+            offset = 0;
+            width  = 0;
+            above  = 0;
+            below  = 0;
+
+            continue;
+        }
+
+        bitmap = active_font->get_char(ch, fs);
 
         if (bitmap == nullptr) {
             bitmap = active_font->get_char(u' ', fs);
@@ -79,40 +186,10 @@ Text& TextManager::create_text(const char16_t* text, Size fs, unsigned int& dip)
             below = (below > bitmap->height - bitmap->bearing_y) ? below : bitmap->height - bitmap->bearing_y;
         }
     }
-
-    width -= bitmap->advance_x;
-    width += bitmap->bearing_x + bitmap->width;
-    dip    = below;
-
-    // Generating a texture object for the whole text generated in OpenGL
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, above + below, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
-
-    unsigned int offset = 0;
-
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    for (const char16_t* start = text; *start != u'\0'; ++start) {
-        const char16_t ch = *start;
-        bitmap            = active_font->get_char(ch, fs);
-
-        glTexSubImage2D(GL_TEXTURE_2D, 0,
-                        offset + bitmap->bearing_x, below + (bitmap->bearing_y - bitmap->height),
-                        bitmap->width, bitmap->height,
-                        GL_RED, GL_UNSIGNED_BYTE, bitmap->data);
-
-        offset += bitmap->advance_x;
-    }
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glBindTexture( GL_TEXTURE_2D, 0);
 
-    ResourceManager::objects.entries.emplace_back(Text{texture, 0.0f, 0.0f, width, above + below});
+    ResourceManager::objects.entries.emplace_back(Text{texture, 0.0f, 0.0f, max_width, max_height});
     ResourceManager::objects.models.emplace_back();
 
     return std::get<Text>(ResourceManager::objects.entries[ResourceManager::objects.entries.size() - 1]);

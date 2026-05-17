@@ -91,7 +91,9 @@ void Engine::start() {
     #endif
 
     unsigned int dip[3];
-    TextManager::create_text(u"あなたはばかですか？", LARGE, dip[0]);
+    //TextManager::create_text(u"あなたは\nばかですか？", LARGE, dip[0]);
+    //TextManager::create_text(u"Are you have\nbig stoobid?", LARGE, dip[0]);
+    TextManager::create_text(u"あなたは\nすごくバカ\nだよね？", LARGE, dip[0]);
     TextManager::create_text(u"はい", LARGE, dip[1]);
     TextManager::create_text(u"いえ", LARGE, dip[2]);
 
@@ -103,17 +105,17 @@ void Engine::start() {
     auto& model3 = ResourceManager::objects.models[2];
 
     text1.x = width / 2.0f;
-    text1.y = (height - text1.h) / 2.0f;
+    text1.y = height / 3.0f;
     model1  = glm::translate(glm::mat4(1.0f), glm::vec3(text1.x + 1, text1.y + 1, 0.0f));
     model1  = glm::scale(model1, glm::vec3(text1.w, text1.h, 1.0f));
 
     text2.x = width / 4.0f;
-    text2.y = height * 3.0f / 4.0f;
+    text2.y = height * 2.0f / 3.0f;
     model2  = glm::translate(glm::mat4(1.0f), glm::vec3(text2.x + 1, text2.y + 1, 0.0f));
     model2  = glm::scale(model2, glm::vec3(text2.w, text2.h, 1.0f));
 
     text3.x = width * 3.0f / 4.0f;
-    text3.y = height * 3.0f / 4.0f;
+    text3.y = height * 2.0f / 3.0f;
     model3  = glm::translate(glm::mat4(1.0f), glm::vec3(text3.x + 1, text3.y + 1, 0.0f));
     model3  = glm::scale(model3, glm::vec3(text3.w, text3.h, 1.0f));
 
@@ -184,7 +186,7 @@ void Engine::framebuffer_size_callback(GLFWwindow* window, int width, int height
 }
 
 void Engine::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_ESCAPE  || key == GLFW_KEY_Q && action == GLFW_PRESS)
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
 
